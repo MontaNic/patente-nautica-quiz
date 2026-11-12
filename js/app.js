@@ -338,6 +338,7 @@
           <li>${EXAM.minutes} minuti</li>
           <li>superata con al massimo ${EXAM.maxErrors} errori (almeno ${EXAM.n - EXAM.maxErrors} giuste)</li>
           <li>le risposte si vedono solo alla consegna, come all'esame</li>
+          <li>puoi tornare sulle domande saltate; cambiare una risposta già data conta come errore</li>
         </ul>
         <p class="muted small">Le domande non risposte contano come errori.</p>
         <button class="btn primary big" id="go">Inizia</button>
@@ -367,12 +368,36 @@
 
     function confirmLeave() { return answers.every((a) => a === null) || window.confirm('Abbandonare la simulazione?'); }
 
-    function render() {
+    const changed = ids.map(() => false); // risposte modificate: all'esame valgono come errore
+    let busy = false;                       // blocca i tocchi durante il passaggio alla domanda successiva
+
+    const goTo = (k) => { if (k === i || k < 0 || k >= ids.length) return; const dir = k > i ? 'next' : 'prev'; i = k; render(dir); };
+
+    function askChange(onChange) {
+      const ov = document.createElement('div');
+      ov.className = 'modal';
+      ov.innerHTML = `<div class="modal-box" role="alertdialog" aria-modal="true">
+          <p class="modal-title">⚠️ Attenzione</p>
+          <p>All'esame non puoi cambiare una risposta già data. Se la modifichi, viene comunque considerata sbagliata.</p>
+          <div class="actions col">
+            <button class="btn primary" data-a="keep">Tieni la risposta</button>
+            <button class="btn danger" data-a="change">Cambiala e conta l'errore</button>
+          </div></div>`;
+      document.body.appendChild(ov);
+      const close = () => ov.remove();
+      ov.querySelector('[data-a="keep"]').onclick = close;
+      ov.querySelector('[data-a="change"]').onclick = () => { close(); onChange(); };
+      ov.onclick = (e) => { if (e.target === ov) close(); };
+      ov.querySelector('[data-a="keep"]').focus();
+    }
+
+    function render(dir) {
+      busy = false;
       const q = BYID[ids[i]];
       h(`
-        <div class="dots">${ids.map((_, k) => `<button class="dot ${answers[k] !== null ? 'done' : ''} ${k === i ? 'cur' : ''}" data-k="${k}" aria-label="Domanda ${k + 1}">${k + 1}</button>`).join('')}</div>
-        <article class="card question">
-          <div class="meta"><span>Domanda ${i + 1} di ${ids.length}</span></div>
+        <div class="dots">${ids.map((_, k) => `<button class="dot ${answers[k] !== null ? 'done' : ''} ${changed[k] ? 'changed' : ''} ${k === i ? 'cur' : ''}" data-k="${k}" aria-label="Domanda ${k + 1}">${k + 1}</button>`).join('')}</div>
+        <article class="card question ${dir ? 'slide-' + dir : ''}">
+          <div class="meta"><span>Domanda ${i + 1} di ${ids.length}</span>${changed[i] ? '<span class="tag warn-tag">risposta modificata: conta come errore</span>' : ''}</div>
           ${q.img ? `<figure class="fig"><img class="qimg" src="data/img/${q.img}" alt="Figura ${q.fig}"><figcaption>Figura ${q.fig}</figcaption></figure>` : ''}
           <p class="qtext">${esc(q.q)}</p>
           <div class="answers">
@@ -385,25 +410,42 @@
         </div>
         <button class="btn primary big" id="submit">Consegna (${answers.filter((a) => a !== null).length}/${ids.length})</button>
       `);
+      const pick = (el) => {
+        el.classList.add('picked', 'pulse');
+        $app.querySelectorAll('.ans').forEach((b) => { if (b !== el) b.classList.remove('picked'); });
+        const counter = document.getElementById('submit');
+        counter.textContent = `Consegna (${answers.filter((a) => a !== null).length}/${ids.length})`;
+        $app.querySelectorAll('.dot')[i].classList.add('done');
+      };
       $app.querySelectorAll('.ans').forEach((el) => {
         el.onclick = () => {
-          answers[i] = Number(el.dataset.k);
-          if (i < ids.length - 1) { i++; } // passa da sola alla successiva
-          render();
+          if (busy) return;
+          const k = Number(el.dataset.k);
+          if (answers[i] === k) return;
+          if (answers[i] === null) {
+            // prima risposta: resta evidenziata un attimo, poi scorre alla domanda successiva
+            answers[i] = k;
+            pick(el);
+            busy = true;
+            setTimeout(() => { if (finished) return; if (i < ids.length - 1) goTo(i + 1); else busy = false; }, 450);
+          } else {
+            askChange(() => { answers[i] = k; changed[i] = true; render(); });
+          }
         };
       });
-      $app.querySelectorAll('.dot').forEach((el) => { el.onclick = () => { i = Number(el.dataset.k); render(); }; });
-      document.getElementById('prev').onclick = () => { i--; render(); };
-      document.getElementById('nxt').onclick = () => { i++; render(); };
+      $app.querySelectorAll('.dot').forEach((el) => { el.onclick = () => { if (!busy) goTo(Number(el.dataset.k)); }; });
+      document.getElementById('prev').onclick = () => { if (!busy) goTo(i - 1); };
+      document.getElementById('nxt').onclick = () => { if (!busy) goTo(i + 1); };
       document.getElementById('submit').onclick = () => {
         const missing = answers.filter((a) => a === null).length;
         if (!missing || window.confirm(`Hai ${missing} domande senza risposta. Consegnare lo stesso?`)) finish(false);
       };
       document.onkeydown = (e) => {
+        if (document.querySelector('.modal')) return;
         const pos = '123'.indexOf(e.key);
         if (pos >= 0) $app.querySelectorAll('.ans')[pos].click();
-        if (e.key === 'ArrowRight' && i < ids.length - 1) { i++; render(); }
-        if (e.key === 'ArrowLeft' && i > 0) { i--; render(); }
+        if (e.key === 'ArrowRight' && !busy) goTo(i + 1);
+        if (e.key === 'ArrowLeft' && !busy) goTo(i - 1);
       };
     }
 
@@ -415,21 +457,23 @@
       let errors = 0;
       ids.forEach((id, k) => {
         const ok = answers[k] === BYID[id].c;
-        if (!ok) errors++;
+        if (!ok || changed[k]) errors++;
         if (answers[k] !== null) SRS.answer(id, ok);
       });
       const passed = errors <= EXAM.maxErrors;
       const used = Math.round((EXAM.minutes * 60000 - Math.max(0, end - Date.now())) / 60000);
       SRS.addExam({ date: Date.now(), errors, minutes: used });
       setHeader('Risultato', home);
-      const wrongIdx = ids.map((id, k) => k).filter((k) => answers[k] !== BYID[ids[k]].c);
+      const wrongIdx = ids.map((id, k) => k).filter((k) => answers[k] !== BYID[ids[k]].c || changed[k]);
+      const nChanged = changed.filter(Boolean).length;
       h(`
         <section class="card center ${passed ? 'pass' : 'fail'}">
           <p class="verdict">${passed ? 'SUPERATA' : 'NON SUPERATA'}</p>
           <p class="big-number">${errors} <small>errori</small></p>
           <p class="muted">${timeout ? 'Tempo scaduto · ' : ''}${used} min usati · massimo ${EXAM.maxErrors} errori</p>
+          ${nChanged ? `<p class="muted small">di cui ${nChanged} per risposte modificate</p>` : ''}
         </section>
-        ${wrongIdx.length ? `<section class="card"><h2>Errori</h2>${wrongIdx.map((k) => reviewItem(ids[k], answers[k])).join('')}</section>` : ''}
+        ${wrongIdx.length ? `<section class="card"><h2>Errori</h2>${wrongIdx.map((k) => (changed[k] && answers[k] === BYID[ids[k]].c ? '<p class="note">Risposta giusta, ma modificata: all\'esame conta come errore.</p>' : '') + reviewItem(ids[k], answers[k])).join('')}</section>` : ''}
         ${examHistory()}
         <div class="actions col">
           <button class="btn primary" id="again">Nuova simulazione</button>
