@@ -33,6 +33,7 @@ Le domande con un problema nel documento originale mostrano un avviso ⚠️ nel
 | Figura stampata sulla riga sbagliata nel PDF dei quiz (spostata) | 687 → 688, 758 → 759 |
 | Figura assente nel PDF dei quiz: presa dal pieghevole, abbinamento da verificare | 654 (fig. 49), 752 (fig. 69), 831 (fig. 79) |
 | Testo sovrapposto, ricostruito | 8, 153, 433, 1025 |
+| Due risposte con lo stesso testo: ricostruita quella vera | 40 (sagola), 517 (calumo) |
 | Risposte troncate nel PDF (segnate con […]) | 78, 236, 316, 390, 397, 668, 1060, 1080, 1283 |
 
 Gli **argomenti** non sono nel PDF: li ho ricavati dalla numerazione delle domande, quindi i confini sono indicativi. Anche la simulazione d'esame pesca le domande in proporzione agli argomenti: è un'approssimazione, perché le schede ministeriali reali non sono pubbliche.

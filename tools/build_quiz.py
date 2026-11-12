@@ -11,6 +11,8 @@ FIX_TEXT={
  8:{'a2':'la superficie verticale interna del pozzetto di poppa.'},
  153:{'q':'Quale può essere la causa più probabile in base alla quale un motore entrobordo emette fumo nero dallo scarico?'},
  433:{'a1':'solo in caso di comunicazioni riguardanti la sicurezza.','a2':'solo per la prima chiamata; per proseguire la comunicazione bisogna poi spostarsi su un altro canale.'},
+ 40:{'a2':'una cima sottile.'},
+ 517:{'a2':'la lunghezza della catena (o della cima) filata in acqua.'},
  1025:{'q':'Si usa la carta gnomonica per la navigazione costiera stimata?','a0':'sempre.'},
 }
 DOUBLE_V={127:1,174:1,188:1,226:0,297:None}
