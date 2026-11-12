@@ -50,9 +50,14 @@ const SRS = (() => {
     const wasNew = r[2] === 0;
     // Giusta al primo colpo: probabilmente la sai già, salta alla scatola 3 (ripasso tra 3 giorni).
     // Così basta una seconda risposta giusta per considerarla imparata.
-    if (correct && wasNew) r[0] = 3;
-    else r[0] = correct ? Math.min(5, Math.max(1, r[0]) + 1) : 1;
-    r[1] = now; r[2] += 1; if (!correct) r[3] += 1;
+    // Una risposta giusta fa salire di scatola solo se il ripasso era in scadenza:
+    // ripetere la stessa domanda più volte nello stesso giorno non vale come "imparata".
+    const promote = r[0] <= 1 || isDue(id, now);
+    if (!correct) { r[0] = 1; r[1] = now; }
+    else if (wasNew) { r[0] = 3; r[1] = now; }
+    else if (promote) { r[0] = Math.min(5, Math.max(1, r[0]) + 1); r[1] = now; }
+    // giusta ma in anticipo: resta dov'è e mantiene la scadenza già fissata
+    r[2] += 1; if (!correct) r[3] += 1;
     state.q[id] = r;
     const d = today(new Date(now));
     const day = state.days[d] || { n: 0, ok: 0, new: 0 };

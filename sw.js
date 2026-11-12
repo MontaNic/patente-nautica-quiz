@@ -1,5 +1,5 @@
 // Service worker: rende l'app utilizzabile offline. Cambia VERSION a ogni modifica dei file.
-const VERSION = 'pn-v3';
+const VERSION = 'pn-v4';
 const FILES = [
 "./",
 "index.html",

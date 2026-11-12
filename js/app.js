@@ -19,6 +19,8 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  // percentuale con un decimale sotto il 10%, così 3 domande su 1.472 non sembrano zero
+  const pctTxt = (a, b) => { if (!b || !a) return '0'; const v = (a / b) * 100; return v < 10 ? v.toFixed(1).replace('.', ',') : String(Math.round(v)); };
   const h = (html) => { $app.innerHTML = html; window.scrollTo(0, 0); };
   const allIds = () => DATA.questions.map((q) => q.id);
   const usable = (q) => q.c !== null && q.c !== undefined;
@@ -95,6 +97,7 @@
     const lastExams = SRS.state.exams.slice(-5);
     const passed = lastExams.filter((e) => e.errors <= EXAM.maxErrors).length;
     const flags = SRS.state.flags.length;
+    const goalDone = !c.due && !newLeft;
 
     h(`
       <section class="card hero">
@@ -102,14 +105,19 @@
         <div class="streak" title="Giorni consecutivi di studio">🔥 ${streak}</div>
       </section>
 
-      <section class="card">
-        <h2>Oggi</h2>
+      ${c.due ? `<a class="card alert" href="#/studio/ripasso">
+        <span class="alert-n">${c.due}</span>
+        <span><b>ripass${c.due === 1 ? 'o' : 'i'} in scadenza oggi</b><small>Falli prima delle domande nuove: è qui che si impara davvero.</small></span>
+        <span class="alert-go">Ripassa →</span></a>` : ''}
+
+      <section class="card ${goalDone ? 'done' : ''}">
+        <h2>${goalDone ? 'Oggi ✓ obiettivo raggiunto' : 'Oggi'}</h2>
         <p class="today-line">${td.n ? `${td.n} risposte, ${pct(td.ok, td.n)}% giuste` : 'Non hai ancora iniziato.'}</p>
         <ul class="todo">
-          <li><span>Ripassi in scadenza</span><b>${c.due}</b></li>
-          <li><span>Domande nuove (obiettivo ${target})</span><b>${newLeft}</b></li>
+          <li class="${c.due ? 'warn' : 'ok'}"><span>Ripassi in scadenza</span><b>${c.due || '✓'}</b></li>
+          <li class="${newLeft ? '' : 'ok'}"><span>Domande nuove (obiettivo ${target})</span><b>${newLeft || '✓'}</b></li>
         </ul>
-        <a class="btn primary big" href="#/studio/oggi">${c.due + newLeft ? 'Studia il programma di oggi' : 'Fatto per oggi ✓ — continua comunque'}</a>
+        <a class="btn ${goalDone ? 'success' : 'primary'} big" href="#/studio/oggi">${goalDone ? 'Fatto per oggi ✓ — continua comunque' : c.due ? `Studia il programma di oggi (${c.due} ripassi + ${newLeft} nuove)` : `Studia le ${newLeft} domande nuove`}</a>
         <a class="btn big" href="#/studio/quick">⚡ Sessione rapida · ${QUICK} domande</a>
       </section>
 
@@ -136,7 +144,7 @@
   function progressBar(c) {
     const m = pct(c.mastered, c.total), k = pct(c.consol, c.total), s = pct(c.seen - c.mastered - c.consol, c.total);
     return `<div class="bar" role="img" aria-label="${m}% imparate"><i class="m" style="width:${m}%"></i><i class="k" style="width:${k}%"></i><i class="s" style="width:${s}%"></i></div>
-            <p class="bar-label"><b>${m}%</b> imparate · <b>${pct(c.consol, c.total)}%</b> quasi</p>`;
+            <p class="bar-label"><b>${pctTxt(c.mastered, c.total)}%</b> imparate · <b>${pctTxt(c.consol, c.total)}%</b> quasi</p>`;
   }
   const fmtDate = (iso) => new Date(iso + 'T12:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'long' });
 
@@ -171,6 +179,7 @@
         const q = due.concat(pickNew(newLeft));
         return q.length ? q : pickNew(QUICK).concat(lowestBox(ids, QUICK));
       }
+      case 'ripasso': return dueSorted(ids);
       case 'quick': {
         const due = dueSorted(ids).slice(0, 6);
         const q = due.concat(pickNew(QUICK - due.length));
@@ -198,14 +207,14 @@
   }
 
   // ---------- sessione di studio ----------
-  const MODE_TITLE = { oggi: 'Studio di oggi', quick: 'Sessione rapida', errori: 'Ripasso errori', segnate: 'Domande segnate', topic: 'Argomento', single: 'Domanda' };
+  const MODE_TITLE = { ripasso: 'Ripassi in scadenza', oggi: 'Studio di oggi', quick: 'Sessione rapida', errori: 'Ripasso errori', segnate: 'Domande segnate', topic: 'Argomento', single: 'Domanda' };
 
   function startSession(mode, arg) {
     const queue = buildQueue(mode, arg);
     const back = mode === 'topic' ? () => go('#/argomenti') : mode === 'single' ? () => history.back() : home;
     setHeader(mode === 'topic' ? DATA.topics[arg] : MODE_TITLE[mode] || 'Studio', back);
     if (!queue.length) {
-      const msg = { errori: 'Nessun errore da ripassare. Ottimo.', segnate: 'Non hai ancora segnato domande. Usa la ⭐ durante lo studio.' }[mode] || 'Niente da fare qui.';
+      const msg = { ripasso: 'Nessun ripasso in scadenza: sei in pari.', errori: 'Nessun errore da ripassare. Ottimo.', segnate: 'Non hai ancora segnato domande. Usa la ⭐ durante lo studio.' }[mode] || 'Niente da fare qui.';
       return h(`<div class="card center"><p>${msg}</p><a class="btn primary" href="#/">Torna alla home</a></div>`);
     }
     const s = { mode, queue: queue.slice(), i: 0, ok: 0, done: 0, wrongs: [], requeued: new Set() };
