@@ -15,7 +15,16 @@ const SRS = (() => {
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY));
-      if (s && s.v === 1) return Object.assign(empty(), s, { settings: Object.assign(empty().settings, s.settings) });
+      if (s && s.v === 1) {
+        const st = Object.assign(empty(), s, { settings: Object.assign(empty().settings, s.settings) });
+        // migrazione: le domande indovinate al primo colpo con la vecchia regola restavano in scatola 2
+        if (!st.mig1) {
+          Object.values(st.q).forEach((r) => { if (r[0] === 2 && r[2] === 1 && r[3] === 0) r[0] = 3; });
+          st.mig1 = true;
+          try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) { /* ignora */ }
+        }
+        return st;
+      }
     } catch (e) { /* storage non disponibile o corrotto */ }
     return empty();
   }
@@ -39,7 +48,10 @@ const SRS = (() => {
   function answer(id, correct, now = Date.now()) {
     const r = rec(id).slice();
     const wasNew = r[2] === 0;
-    r[0] = correct ? Math.min(5, Math.max(1, r[0]) + 1) : 1;
+    // Giusta al primo colpo: probabilmente la sai già, salta alla scatola 3 (ripasso tra 3 giorni).
+    // Così basta una seconda risposta giusta per considerarla imparata.
+    if (correct && wasNew) r[0] = 3;
+    else r[0] = correct ? Math.min(5, Math.max(1, r[0]) + 1) : 1;
     r[1] = now; r[2] += 1; if (!correct) r[3] += 1;
     state.q[id] = r;
     const d = today(new Date(now));

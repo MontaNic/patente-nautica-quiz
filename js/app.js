@@ -42,6 +42,11 @@
     }
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
     window.addEventListener('hashchange', route);
+    // un link verso la pagina in cui sei già non genera 'hashchange': in quel caso ricarico la vista a mano
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest('a[href^="#"]');
+      if (a && a.getAttribute('href') === location.hash) { e.preventDefault(); route(); }
+    });
     route();
   }
 
@@ -67,15 +72,16 @@
 
   // ---------- home ----------
   function counts(ids = allIds()) {
-    let seenN = 0, mastered = 0, due = 0, errors = 0;
+    let seenN = 0, mastered = 0, due = 0, errors = 0, consol = 0;
     for (const id of ids) {
       const r = SRS.rec(id);
       if (r[2] > 0) seenN++;
+      if (r[0] === 3) consol++;
       if (r[0] >= SRS.MASTERED) mastered++;
       if (SRS.isDue(id)) due++;
       if (r[2] > 0 && r[0] === 1) errors++;
     }
-    return { total: ids.length, seen: seenN, mastered, due, errors };
+    return { total: ids.length, seen: seenN, mastered, due, errors, consol };
   }
 
   function viewHome() {
@@ -110,7 +116,8 @@
       <section class="card">
         <h2>Progressi</h2>
         ${progressBar(c)}
-        <p class="muted small">${c.mastered} imparate · ${c.seen - c.mastered} in corso · ${c.total - c.seen} mai viste</p>
+        <p class="muted small">${c.mastered} imparate · ${c.consol} quasi (manca un ripasso) · ${c.seen - c.mastered - c.consol} da rafforzare · ${c.total - c.seen} mai viste</p>
+        <p class="muted small">Una domanda diventa "imparata" quando la indovini anche al ripasso, a qualche giorno di distanza.</p>
       </section>
 
       <nav class="grid">
@@ -127,9 +134,9 @@
   }
 
   function progressBar(c) {
-    const m = pct(c.mastered, c.total), s = pct(c.seen - c.mastered, c.total);
-    return `<div class="bar" role="img" aria-label="${m}% imparate"><i class="m" style="width:${m}%"></i><i class="s" style="width:${s}%"></i></div>
-            <p class="bar-label"><b>${m}%</b> imparate</p>`;
+    const m = pct(c.mastered, c.total), k = pct(c.consol, c.total), s = pct(c.seen - c.mastered - c.consol, c.total);
+    return `<div class="bar" role="img" aria-label="${m}% imparate"><i class="m" style="width:${m}%"></i><i class="k" style="width:${k}%"></i><i class="s" style="width:${s}%"></i></div>
+            <p class="bar-label"><b>${m}%</b> imparate · <b>${pct(c.consol, c.total)}%</b> quasi</p>`;
   }
   const fmtDate = (iso) => new Date(iso + 'T12:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'long' });
 

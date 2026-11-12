@@ -57,6 +57,7 @@ button { font: inherit; color: inherit; }
 .bar { height: 12px; border-radius: 999px; background: var(--line); overflow: hidden; display: flex; }
 .bar i { display: block; height: 100%; }
 .bar .m { background: var(--ok); }
+.bar .k { background: var(--ok); opacity: .45; }
 .bar .s { background: var(--accent); opacity: .45; }
 .bar-label { margin: 6px 0 2px; }
 
